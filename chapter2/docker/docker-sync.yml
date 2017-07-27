@@ -1,0 +1,20 @@
+version: 2
+syncs:
+  pystudy-volume:
+    src: '../'
+    sync_strategy: 'unison'
+    sync_host_ip: '127.0.0.1'
+
+    sync_host_port: 10999
+    sync_excludes_type: 'Name'
+
+    sync_excludes: ['docker', '.DS_Store', '.idea']
+    #sync_args: '-v'
+
+    #sync_userid: 'root'
+    #sync_group: 'root'
+
+    watch_args: '-v'
+
+    watch_excludes: ['.*/.git']
+    watch_strategy: 'fswatch'
