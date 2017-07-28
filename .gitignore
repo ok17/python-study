@@ -156,3 +156,6 @@ fabric.properties
 
 .idea
 
+chapter2/docker/.docker-sync/
+chapter4/mnist/*
+
