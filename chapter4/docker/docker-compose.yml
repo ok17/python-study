@@ -1,0 +1,14 @@
+version: '2'
+services:
+  pystudy-ch4-app:
+    build: ./app
+    container_name: pystudy-ch4-app
+    hostname: pystudy-ch4-app
+    volumes:
+     - pystudy-ch4-volume:/var/www/html:rw
+    ports:
+      - 80:80
+
+volumes:
+  pystudy-ch4-volume:
+    external: true

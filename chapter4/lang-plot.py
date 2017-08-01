@@ -16,8 +16,8 @@ for i, lbl in enumerate(freq[0]["labels"]):
         lang_dic[lbl] = fq
         continue
 
-    print("lang:", lang_dic)
-    exit()
+    # print("lang:", lang_dic)
+    # exit()
 
     for idx, v in enumerate(fq):
         lang_dic[lbl][idx] = (lang_dic[lbl][idx] + v) / 2

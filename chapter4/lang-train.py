@@ -59,9 +59,13 @@ test = load_files("./lang/test/*.txt")
 with open("./lang/freq.json", "w", encoding="utf-8") as fp:
     json.dump([data, test], fp)
 
+# サポートベクターマシン
 clf = svm.SVC()
+
+# 教師ありデータの学習
 clf.fit(data["freqs"], data["labels"])
 
+# 推定
 predict = clf.predict(test["freqs"])
 
 
