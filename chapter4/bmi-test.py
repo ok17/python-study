@@ -27,6 +27,8 @@ print("label_test", label_test)
 
 # データ学習
 clf = svm.SVC()
+# 線形カーネルに特化したSVM 計算が高速
+# clf = svm.LinearSVC()
 clf.fit(data_train, label_train)
 
 
