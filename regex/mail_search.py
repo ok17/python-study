@@ -4,16 +4,12 @@ import re
 
 class ExtractRegex:
 
-    NAMEPATTERN = r"氏名|名|名前"
-    STATIONPATTERN = r"最寄り駅|最寄駅｜最寄"
-    SKILLPATTERN = r"スキル"
-    COSTPATTERN = r"単価"
-
     def __init__(self):
-        self.name_patter = re.compile(self.NAMEPATTERN)
-        self.station_patter = re.compile(self.STATIONPATTERN)
-        self.skill_patter = re.compile(self.SKILLPATTERN)
-        self.cost_patter = re.compile(self.COSTPATTERN)
+        self.name_patter = re.compile(r"((.)?(氏(\s*)名|名(\s*)前|名)(\W*)(.*))", re.VERBOSE)
+        self.station_patter = re.compile(r"(((.)?(最(\s*)寄(.)?(駅)?)(\W*)(.*)))", re.VERBOSE)
+        self.skill_patter = re.compile(r"((.)?(ス(\s*)キ(\s*)ル)(\W*)(.*))", re.VERBOSE)
+        self.cost_patter = re.compile(r"((.)?(単(\s*)金|単(\s*)価|金(\s*)額)(\W*)(.*))", re.VERBOSE)
+        self.belongs_patter = re.compile(r"((.)?(所(\s*)属)(\W*)(.*))", re.VERBOSE)
 
     """
     項目ごとにカスタマイズする可能性考慮
@@ -23,11 +19,8 @@ class ExtractRegex:
         match = self.name_patter.search(line)
 
         if match is not None:
-            end = match.end()
-            _str = line[end + 1:]
-            str = _str.strip()
-
-            return str
+            _name = match.group(7)
+            return _name
 
         return False
 
@@ -35,8 +28,8 @@ class ExtractRegex:
         match = self.station_patter.search(line)
 
         if match is not None:
-            end = match.end()
-            return line[end + 1:]
+            _station = match.group(9)
+            return _station
 
         return False
 
@@ -44,7 +37,8 @@ class ExtractRegex:
         match = self.skill_patter.search(line)
 
         if match is not None:
-            return line[match.end() + 1:]
+            _skill = match.group(7)
+            return _skill
 
         return False
 
@@ -52,8 +46,17 @@ class ExtractRegex:
         match = self.cost_patter.search(line)
 
         if match is not None:
-            span = match.span()
-            return line[span[1] + 1:]
+            _cost = match.group(8)
+            return _cost
+
+        return False
+
+    def belongs(self, line):
+        match = self.belongs_patter.search(line)
+
+        if match is not None:
+            _belongs = match.group(6)
+            return _belongs
 
         return False
 
@@ -72,6 +75,7 @@ for txt in dir_list:
         _station = ""
         _skill = ""
         _cost = ""
+        _belongs = ""
         for l in lines:
             if not _name:
                 _name = ext.name(l)
@@ -85,46 +89,14 @@ for txt in dir_list:
             if not _cost:
                 _cost = ext.cost(l)
 
+            if not _belongs:
+                _belongs = ext.belongs(l)
+
                 # 複数できない項目があった場合はエラーで通知しておくか
 
         print(_name)
         print(_station)
         print(_skill)
         print(_cost)
-
-# fp = open("name.txt", "r", encoding="utf-8")
-# line = fp.read()
-# fp.close()
-#
-# lines = line.split('\n')
-#
-# ext = ExtractRegex()
-#
-# _name = ""
-# _station = ""
-# _skill = ""
-# _cost = ""
-#
-# for l in lines:
-#     if not _name:
-#         _name = ext.name(l)
-#
-#     if not _station:
-#         _station = ext.station(l)
-#
-#     if not _skill:
-#         _skill = ext.skill(l)
-#
-#     if not _cost:
-#         _cost = ext.cost(l)
-#
-#
-#     # 複数できない項目があった場合はエラーで通知しておくか
-#
-# print(_name)
-# print(_station)
-# print(_skill)
-# print(_cost)
-#
-
+        print(_belongs)
 

@@ -23,6 +23,7 @@ APPLICATION_NAME = 'Gmail API Python Quickstart'
 
 APP_ROOT   = os.path.dirname(os.path.abspath( __file__ ))
 MAIL_DIR   = 'emails'
+ATTACHMENT_DIR = 'attachment'
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -64,6 +65,7 @@ def main():
     service = discovery.build('gmail', 'v1', http=http)
     # labelリストを取得
     results = service.users().messages().list(userId='me', labelIds='Label_15', q='is:unread').execute()
+    # results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=35).execute()
     messages = results.get('messages', [])
 
     # mail_filter = MailFilterBayseModel()
@@ -73,9 +75,10 @@ def main():
         print(message['id'])
 
     try:
-            # msg_obj = service.users().messages().get(userId='me', id='15da263a7efef3a0').execute()
+            # msg_obj = service.users().messages().get(userId='me', id='15da76b21fecf9ee').execute()
+
             msg_obj = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-            email   = MailObject(msg_obj['payload'])
+            email = MailObject(msg_obj['payload'])
 
             mail_text = email.subject + '\n\n' + email.message
             # result    = mail_filter.calc(mail_text)
@@ -86,6 +89,18 @@ def main():
             f.write(mail_text)
             f.close()
 
+            if email.attachment_id:
+                data = service.users().messages().attachments().get(userId='me', messageId=message['id'], id=email.attachment_id).execute()
+                # for part in data['payload']['parts']:
+                #     print("agagagaga", part['filename'])
+                #     if part['filename']:
+                file_data = base64.urlsafe_b64decode(data['data'].encode('UTF-8'))
+
+                fp = open(os.path.join(APP_ROOT, ATTACHMENT_DIR, email.file_name), 'wb')
+                fp.write(file_data)
+                fp.close()
+
+            #既読
             service.users().messages() \
                 .modify(userId='me', id=message['id'], body={"removeLabelIds": ['UNREAD']}).execute()
 
@@ -94,6 +109,8 @@ def main():
             print('send_date : ', email.send_date)
             print('from_addr : ', email.from_addr)
             print('to_addr : ', email.to_addr)
+            print('attachment_id : ', email.attachment_id)
+            print('file_name : ', email.file_name)
             print('body    : \n', email.message)
             print('===========================================================')
 
@@ -110,22 +127,48 @@ class MailObject(object):
     from_addr = ""
     to_addr = ""
     send_date = ""
+    attachment_id = ""
+    file_name = ""
 
     def __init__(self, payload):
         super(MailObject, self).__init__()
         body = ""
+        attachment_id = ""
+        file_name = ""
 
         if 'data' in payload['body']:
             body = payload['body']['data']
 
+        # elif 'parts' in payload:
+        #     for part in payload['parts']:
+        #         if len(body) == 0 and 'body' in part and 'data' in part['body']:
+        #             body = part['body']['data']
+        #         elif 'parts' in part:
+        #             for subpart in part['parts']:
+        #                 if len(body) == 0 and 'body' in subpart and 'data' in subpart['body']:
+        #                     body = subpart['body']['data']
+
+
+        # payloadのmimeTypeで['multipart/mixed']と['text/plain']できりわけがよいかも
         elif 'parts' in payload:
             for part in payload['parts']:
-                if len(body) == 0 and 'body' in part and 'data' in part['body']:
+                if part['mimeType'] == "text/plain":
+                    # print("text@@@@@@")
                     body = part['body']['data']
+
+                elif part['mimeType'] == "application/octet-stream":
+                    # print("attachment_id@@@@@@")
+                    attachment_id = part['body']['attachmentId']
+                    file_name = part['filename']
+
+                    # attachmentにdataがない時は取得にいく
+                    # あるときはdataに格納されているようだs
+
                 elif 'parts' in part:
                     for subpart in part['parts']:
                         if len(body) == 0 and 'body' in subpart and 'data' in subpart['body']:
                             body = subpart['body']['data']
+
 
         for item in payload['headers']:
             if item['name'] == 'Subject':
@@ -141,6 +184,8 @@ class MailObject(object):
             elif item['name'] == 'From':
                 self.from_addr = item['value']
 
+        self.file_name = file_name
+        self.attachment_id = attachment_id
         self.message = email.message_from_string(base64.urlsafe_b64decode(body).decode('utf-8')).as_string()
 
 

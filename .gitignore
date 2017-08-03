@@ -164,5 +164,5 @@ chapter4/bmi-test.png
 chapter4/cgi-bin/
 chapter4/docker/.docker-sync/
 chapter4/mnist/
-mail/
+mail
 regex/name.txt
