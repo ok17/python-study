@@ -1,4 +1,4 @@
-import httplib2, os, email, base64, json
+import httplib2, os, email, base64, json, sys
 import dateutil.parser
 
 from apiclient import discovery
@@ -64,7 +64,7 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('gmail', 'v1', http=http)
     # labelリストを取得
-    results = service.users().messages().list(userId='me', labelIds='Label_15', q='is:unread').execute()
+    results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=10, q='is:unread').execute()
     # results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=35).execute()
     messages = results.get('messages', [])
 
@@ -75,41 +75,41 @@ def main():
         print(message['id'])
 
     try:
-            # msg_obj = service.users().messages().get(userId='me', id='15da76b21fecf9ee').execute()
+            # msg_obj = service.users().messages().get(userId='me', id='15dac6f3feaaf76f').execute()
 
             msg_obj = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-            email = MailObject(msg_obj['payload'])
+            # msg_obj = service.users().messages().get(userId='me', id='15dac11af669c765', format='full').execute()
+
+            # print("--payload---", msg_obj['payload'])
+            # print("---parts---", msg_obj['payload']['parts'])
+            # print("---body---", msg_obj['payload']['body'])
+            # print("---header---", msg_obj['payload']['headers'])
+            # exit()
+
+            email = MailObject(msg_obj['payload'], message['id'])
+            email.set_messages()
 
             mail_text = email.subject + '\n\n' + email.message
             # result    = mail_filter.calc(mail_text)
 
-            # f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
+            #####  f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
             f = open(os.path.join(APP_ROOT, MAIL_DIR, message['id'] + '.txt'), 'w')
             # f = open(os.path.join(APP_ROOT, MAIL_DIR, 'aaaa.txt'), 'w')
             f.write(mail_text)
             f.close()
 
-            if email.attachment_id:
-                data = service.users().messages().attachments().get(userId='me', messageId=message['id'], id=email.attachment_id).execute()
-                # for part in data['payload']['parts']:
-                #     print("agagagaga", part['filename'])
-                #     if part['filename']:
-                file_data = base64.urlsafe_b64decode(data['data'].encode('UTF-8'))
-
-                fp = open(os.path.join(APP_ROOT, ATTACHMENT_DIR, email.file_name), 'wb')
-                fp.write(file_data)
-                fp.close()
 
             #既読
             service.users().messages() \
                 .modify(userId='me', id=message['id'], body={"removeLabelIds": ['UNREAD']}).execute()
+
+
 
             print('===========================================================')
             print('subject : ', email.subject)
             print('send_date : ', email.send_date)
             print('from_addr : ', email.from_addr)
             print('to_addr : ', email.to_addr)
-            print('attachment_id : ', email.attachment_id)
             print('file_name : ', email.file_name)
             print('body    : \n', email.message)
             print('===========================================================')
@@ -127,67 +127,97 @@ class MailObject(object):
     from_addr = ""
     to_addr = ""
     send_date = ""
-    attachment_id = ""
     file_name = ""
+    mime_type = ""
 
-    def __init__(self, payload):
+    def __init__(self, payload, message_id):
         super(MailObject, self).__init__()
-        body = ""
-        attachment_id = ""
-        file_name = ""
+        self.__message_id = message_id
+        self.__mime_type = payload['mimeType']
+        self.__headers = payload['headers']
+        self.__body = payload['body']
 
-        if 'data' in payload['body']:
-            body = payload['body']['data']
+        if self.__body['size'] == 0:
+            self.__parts = payload['parts']
 
-        # elif 'parts' in payload:
-        #     for part in payload['parts']:
-        #         if len(body) == 0 and 'body' in part and 'data' in part['body']:
-        #             body = part['body']['data']
-        #         elif 'parts' in part:
-        #             for subpart in part['parts']:
-        #                 if len(body) == 0 and 'body' in subpart and 'data' in subpart['body']:
-        #                     body = subpart['body']['data']
+    def set_messages(self):
+        self.__set_parts()
+        self.__set_headers()
 
+    def __set_parts(self):
+        print("__set_parts start \n")
+        raw_message = ""
+        if self.__body['size'] == 0:
+            """
+                body.sizeが0の時はpartの中にデータがあるはず
+            """
+            for part in self.__parts:
+                if part["partId"] == '0':
+                    # partIdが0のものがメッセージの本文であろう
+                    raw_message = part['body']['data']
+                else:
+                    # 添付ファイルの数分partがあるはず
+                    self.__download_attachment(part)
+        else:
+            raw_message = self.__body['data']
 
-        # payloadのmimeTypeで['multipart/mixed']と['text/plain']できりわけがよいかも
-        elif 'parts' in payload:
-            for part in payload['parts']:
-                if part['mimeType'] == "text/plain":
-                    # print("text@@@@@@")
-                    body = part['body']['data']
+        self.message = email.message_from_string(base64.urlsafe_b64decode(raw_message).decode('utf-8')).as_string()
 
-                elif part['mimeType'] == "application/octet-stream":
-                    # print("attachment_id@@@@@@")
-                    attachment_id = part['body']['attachmentId']
-                    file_name = part['filename']
+    def __set_headers(self):
+        print("__set_headers start \n")
+        for header in self.__headers:
+            if header['name'] == "Subject":
+                self.subject = header['value']
 
-                    # attachmentにdataがない時は取得にいく
-                    # あるときはdataに格納されているようだs
-
-                elif 'parts' in part:
-                    for subpart in part['parts']:
-                        if len(body) == 0 and 'body' in subpart and 'data' in subpart['body']:
-                            body = subpart['body']['data']
-
-
-        for item in payload['headers']:
-            if item['name'] == 'Subject':
-                self.subject = item['value']
-
-            elif item['name'] == 'Date':
-                _date = dateutil.parser.parse(item['value'])
+            elif header['name'] == "Date":
+                _date = dateutil.parser.parse(header['value'])
                 self.send_date = _date.strftime('%Y-%m-%d %H:%M:%S')
 
-            elif item['name'] == 'To':
-                self.to_addr = item['value']
+            elif header['name'] == "To":
+                self.to_addr = header['value']
 
-            elif item['name'] == 'From':
-                self.from_addr = item['value']
+            elif header['name'] == "From":
+                self.from_addr = header['value']
+        print("__set_headers end \n")
 
-        self.file_name = file_name
-        self.attachment_id = attachment_id
-        self.message = email.message_from_string(base64.urlsafe_b64decode(body).decode('utf-8')).as_string()
+    def __download_attachment(self, part):
+        self.mime_type = part["mimeType"]
+        if part["filename"]:
+            self.file_name = part["filename"]
 
+        else:
+            _ext = ".txt"
+            if self.mime_type == "text/html":
+                _ext = ".html"
+
+            self.file_name = self.__message_id + "_" + part["partId"] + _ext
+
+        if "attachmentId" in part["body"]:
+            # データを取得しにいく
+            raw_data = self.__get_attachment(part["body"]["attachmentId"])
+            self.__save_data(raw_data["data"])
+
+        else:
+            self.__save_data(part["body"]["data"])
+
+    def __get_attachment(self, attId):
+        credentials = get_credentials()
+        http = credentials.authorize(httplib2.Http())
+        service = discovery.build('gmail', 'v1', http=http)
+        raw_file_data = service.users().messages().attachments() \
+            .get(userId='me', messageId=self.__message_id, id=attId).execute()
+
+        return raw_file_data
+
+    def __save_data(self, raw_data):
+        mode = "w"
+
+        if self.mime_type != "text/plain":
+            mode = "wb"
+
+        file_data = base64.urlsafe_b64decode(raw_data.encode('UTF-8'))
+        with open(os.path.join(APP_ROOT, ATTACHMENT_DIR, self.file_name), mode) as fp:
+            fp.write(file_data)
 
 if __name__ == '__main__':
     main()
