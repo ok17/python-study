@@ -64,8 +64,8 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('gmail', 'v1', http=http)
     # labelリストを取得
-    results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=10, q='is:unread').execute()
-    # results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=35).execute()
+    #results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=10, q='is:unread').execute()
+    results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=50).execute()
     messages = results.get('messages', [])
 
     # mail_filter = MailFilterBayseModel()
@@ -91,6 +91,11 @@ def main():
 
             mail_text = email.subject + '\n\n' + email.message
             # result    = mail_filter.calc(mail_text)
+
+            mail_dir = os.path.join(APP_ROOT, MAIL_DIR)
+
+            if not os.path.exists(mail_dir):
+                os.mkdirs(mail_dir)
 
             #####  f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
             f = open(os.path.join(APP_ROOT, MAIL_DIR, message['id'] + '.txt'), 'w')
@@ -214,6 +219,11 @@ class MailObject(object):
 
         if self.mime_type != "text/plain":
             mode = "wb"
+
+        attach_dir = os.path.join(APP_ROOT, ATTACHMENT_DIR)
+
+        if not os.path.exists(attach_dir):
+            os.mkdirs(attach_dir)
 
         file_data = base64.urlsafe_b64decode(raw_data.encode('UTF-8'))
         with open(os.path.join(APP_ROOT, ATTACHMENT_DIR, self.file_name), mode) as fp:
