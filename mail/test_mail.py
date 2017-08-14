@@ -65,62 +65,66 @@ def main():
     service = discovery.build('gmail', 'v1', http=http)
     # labelリストを取得
     #results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=10, q='is:unread').execute()
-    results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=50).execute()
+    results = service.users().messages().list(userId='me', labelIds='Label_15', maxResults=10).execute()
     messages = results.get('messages', [])
 
     # mail_filter = MailFilterBayseModel()
 
+    i = 0
 
     for message in messages:
         print(message['id'])
 
-    try:
-            # msg_obj = service.users().messages().get(userId='me', id='15dac6f3feaaf76f').execute()
+        try:
+                # msg_obj = service.users().messages().get(userId='me', id='15dac6f3feaaf76f').execute()
+                i += 1
 
-            msg_obj = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-            # msg_obj = service.users().messages().get(userId='me', id='15dac11af669c765', format='full').execute()
+                print("これは{}回目". format(i))
 
-            # print("--payload---", msg_obj['payload'])
-            # print("---parts---", msg_obj['payload']['parts'])
-            # print("---body---", msg_obj['payload']['body'])
-            # print("---header---", msg_obj['payload']['headers'])
-            # exit()
+                msg_obj = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
+                # msg_obj = service.users().messages().get(userId='me', id='15dac11af669c765', format='full').execute()
 
-            email = MailObject(msg_obj['payload'], message['id'])
-            email.set_messages()
+                # print("--payload---", msg_obj['payload'])
+                # print("---parts---", msg_obj['payload']['parts'])
+                # print("---body---", msg_obj['payload']['body'])
+                # print("---header---", msg_obj['payload']['headers'])
+                # exit()
 
-            mail_text = email.subject + '\n\n' + email.message
-            # result    = mail_filter.calc(mail_text)
+                email = MailObject(msg_obj['payload'], message['id'])
+                email.set_messages()
 
-            mail_dir = os.path.join(APP_ROOT, MAIL_DIR)
+                mail_text = email.subject + '\n\n' + email.message
+                # result    = mail_filter.calc(mail_text)
 
-            if not os.path.exists(mail_dir):
-                os.mkdirs(mail_dir)
+                mail_dir = os.path.join(APP_ROOT, MAIL_DIR)
 
-            #####  f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
-            f = open(os.path.join(APP_ROOT, MAIL_DIR, message['id'] + '.txt'), 'w')
-            # f = open(os.path.join(APP_ROOT, MAIL_DIR, 'aaaa.txt'), 'w')
-            f.write(mail_text)
-            f.close()
+                if not os.path.exists(mail_dir):
+                    os.mkdirs(mail_dir)
 
-
-            #既読
-            service.users().messages() \
-                .modify(userId='me', id=message['id'], body={"removeLabelIds": ['UNREAD']}).execute()
+                #####  f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
+                f = open(os.path.join(APP_ROOT, MAIL_DIR, message['id'] + '.txt'), 'w')
+                # f = open(os.path.join(APP_ROOT, MAIL_DIR, 'aaaa.txt'), 'w')
+                f.write(mail_text)
+                f.close()
 
 
+                #既読
+                service.users().messages() \
+                    .modify(userId='me', id=message['id'], body={"removeLabelIds": ['UNREAD']}).execute()
 
-            print('===========================================================')
-            print('subject : ', email.subject)
-            print('send_date : ', email.send_date)
-            print('from_addr : ', email.from_addr)
-            print('to_addr : ', email.to_addr)
-            print('file_name : ', email.file_name)
-            print('body    : \n', email.message)
-            print('===========================================================')
 
-    except Exception as e:
-            print(e)
+
+                print('===========================================================')
+                print('subject : ', email.subject)
+                print('send_date : ', email.send_date)
+                print('from_addr : ', email.from_addr)
+                print('to_addr : ', email.to_addr)
+                print('file_name : ', email.file_name)
+                print('body    : \n', email.message)
+                print('===========================================================')
+
+        except Exception as e:
+                print(e)
 
 
 class MailObject(object):
