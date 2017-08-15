@@ -1,44 +1,71 @@
 import os
 import re
 import mojimoji
+from enum import IntEnum
+
+class Property(IntEnum):
+    NAME = 1
+    GENDER = 2
+    SKILL = 3
+    COST = 4
+    BELONGS = 5
+    STATION = 6
+
+HUMAN_PROPERTIES = {
+    Property.NAME: {
+        "patter": "((.)?(氏(\s*)名|名(\s*)前|名))",
+        "no": 7
+    },
+    Property.GENDER: {
+        "patter": "((.)?(性(\s*)別))",
+        "no": 6
+    },
+    Property.SKILL: {
+        "patter": "((.)?(ス(\s*)キ(\s*)ル))",
+        "no": 7
+    },
+    Property.COST: {
+        "patter": "((.)?(単(\s*)金|単(\s*)価|金(\s*)額))",
+        "no": 8
+    },
+    Property.BELONGS: {
+        "patter": "((.)?(所(\s*)属))",
+        "no": 6
+    },
+    Property.STATION: {
+        "patter": "(((.)?(最(\s*)寄(.)?(駅)?)))",
+        "no": 9
+    }
+}
+
+CHARACTER = "(.*)"
+DELIMITER = "([ -\/:-@\[-`\{-\~])"
 
 
 class ExtractRegex:
 
-    delimiter = r"([ -\/:-@\[-`\{-\~])"
-    # delimiter = "([ -\/:-@\[-`\{-\~])"
-    character = "(.*)"
-
-
     def __init__(self):
-        # self.name_patter = re.compile(r"((.)?(氏(\s*)名|名(\s*)前|名)(\W*)(.*))", re.VERBOSE)
 
+        # if Property.NAME == 1:
+        #     print("jjjjjjjjjj")
+        # print("nananana",Property.NAME)
+        # print("babab", HUMAN_PROPERTIES[Property.NAME]["patter"])
+        # print("babab", HUMAN_PROPERTIES[Property.NAME]["no"])
+        # print("count", len(HUMAN_PROPERTIES))
+        # print(HUMAN_PROPERTIES[Property.NAME]["patter"])
+        # exit()
 
-        # self.name_patter = re.compile(r"((.)?(氏(\s*)名|名(\s*)前|名)([ -\/:-@\[-`\{-\~])+(.*))", re.VERBOSE)
-        # self._name_patter = re.compile("{}{}+{}".format(self.name_patter, self.delimiter, self.character))
+        self.checked = {}
+
+        for index in range(len(HUMAN_PROPERTIES)):
+            self.checked[index + 1] = False
 
         self.__name = None
         self.__skill = None
         self.__cost = None
         self.__belongs = None
         self.__station = None
-        # self.name = re.compile("{}{}+{}".format(self.name_patter, self.delimiter, self.character))
-
-
-        # print(self._name_patter)
-        #
-        # print("1234\n567890")
-        # print("1234\\n567890")
-        # print(r"1234\n567890")
-        self.create_pattern()
-        #
-        # print("iaaaa\gaga\ag")
-        # exit()
-        # self.station_patter = re.compile(r"(((.)?(最(\s*)寄(.)?(駅)?)(\W*)(.*)))", re.VERBOSE)
-        #self.skill_patter = re.compile(r"((.)?(ス(\s*)キ(\s*)ル)(\W*)(.*))", re.VERBOSE)
-        # self.cost_patter = re.compile(r"((.)?(単(\s*)金|単(\s*)価|金(\s*)額)(\W*)(.*))", re.VERBOSE)
-        # self.belongs_patter = re.compile(r"((.)?(所(\s*)属)(\W*)(.*))", re.VERBOSE)
-        # self.gender_patter = re.compile(r"'((.)?(性(\s*)別)'+delimiter+'(.*))'", re.VERBOSE)
+        self.__gender = None
 
     @property
     def name(self):
@@ -84,112 +111,82 @@ class ExtractRegex:
     def station(self, input_station):
         self.__station = input_station
 
-    def create_pattern(self):
-        name_patter = r"((.)?(氏(\s*)名|名(\s*)前|名))"
-        skill_patter = r"((.)?(ス(\s*)キ(\s*)ル))"
-        cost_patter = r"((.)?(単(\s*)金|単(\s*)価|金(\s*)額))"
-        belongs_patter = r"((.)?(所(\s*)属))"
-        station_patter = r"(((.)?(最(\s*)寄(.)?(駅)?)))"
+    @property
+    def gender(self):
+        return self.__gender
 
-        self.name = re.compile("{}{}+{}".format(name_patter, self.delimiter, self.character))
-        self.skill = re.compile("{}{}+{}".format(skill_patter, self.delimiter, self.character))
-        self.cost = re.compile("{}{}+{}".format(cost_patter, self.delimiter, self.character))
-        self.belongs = re.compile("{}{}+{}".format(belongs_patter, self.delimiter, self.character))
-        self.station = re.compile("{}{}+{}".format(station_patter, self.delimiter, self.character))
+    @gender.setter
+    def gender(self, input_gender):
+        self.__gender = input_gender
+
 
     """
     項目ごとにカスタマイズする可能性考慮
     """
+    def check_patter(self, line):
+        for prop in HUMAN_PROPERTIES:
+            if self.__is_checked(prop) is True:
+                continue
 
-    def re_name(self, line):
-        match = self.name.search(line)
+            patter = re.compile(r"{}{}+{}".format(HUMAN_PROPERTIES[prop]["patter"], DELIMITER, CHARACTER))
 
-        if match is not None:
-            _name = match.group(7)
-            return _name
+            match = patter.search(line)
 
-        return False
+            if match is not None:
+                _character = match.group(HUMAN_PROPERTIES[prop]["no"])
+                self.__set_val(prop, _character)
 
-    def re_station(self, line):
-        match = self.station.search(line)
+    def __is_checked(self, property):
+        return self.checked[property]
 
-        if match is not None:
-            _station = match.group(9)
-            return _station
+    def __set_val(self, property, character):
+        self.checked[property] = True
 
-        return False
+        if Property.NAME is property:
+            self.name = character
 
-    def re_skill(self, line):
-        match = self.skill.search(line)
+        elif Property.SKILL is property:
+            self.skill = character
 
-        if match is not None:
-            _skill = match.group(7)
-            return _skill
+        elif Property.COST is property:
+            self.cost = character
 
-        return False
+        elif Property.STATION is property:
+            self.station = character
 
-    def re_cost(self, line):
-        match = self.cost.search(line)
+        elif Property.GENDER is property:
+            self.gender = character
+            print("gender", character)
 
-        if match is not None:
-            _cost = match.group(8)
-            return _cost
+        elif Property.BELONGS is property:
+            self.belongs = character
 
-        return False
+if __name__ == "__main__":
 
-    def re_belongs(self, line):
-        match = self.belongs.search(line)
+    DIRPATH = "../mail/emails/"
 
-        if match is not None:
-            _belongs = match.group(6)
-            return _belongs
+    dir_list = os.listdir(DIRPATH)
 
-        return False
+    for txt in dir_list:
+        print("--------------初め-------------------\n")
+        with open(DIRPATH + txt, "r", encoding="utf-8") as fp:
+            line = fp.read()
 
-DIRPATH = "../mail/emails/"
+            lines = line.split('\n')
+            ext = ExtractRegex()
 
-dir_list = os.listdir(DIRPATH)
-
-for txt in dir_list:
-    with open(DIRPATH + txt, "r", encoding="utf-8") as fp:
-        line = fp.read()
-
-        lines = line.split('\n')
-        ext = ExtractRegex()
-
-        _name = ""
-        _station = ""
-        _skill = ""
-        _cost = ""
-        _belongs = ""
-        for l in lines:
-            # 全角から半角へ変換
-            l_to_han = mojimoji.zen_to_han(l, kana=False)
-            if not _name:
-                # print("name:", l_to_han)
-                _name = ext.re_name(l_to_han)
-
-            if not _station:
-                # print("station:", l_to_han)
-                _station = ext.re_station(l_to_han)
-
-            if not _skill:
-                # print("skill:", l_to_han)
-                _skill = ext.re_skill(l_to_han)
-
-            if not _cost:
-                # print("cost:", l_to_han)
-                _cost = ext.re_cost(l_to_han)
-
-            if not _belongs:
-                # print("belongs:", l_to_han)
-                _belongs = ext.re_belongs(l_to_han)
+            for l in lines:
+                # 全角から半角へ変換
+                l_to_han = mojimoji.zen_to_han(l, kana=False)
+                ext.check_patter(l_to_han)
 
                 # 複数できない項目があった場合はエラーで通知しておくか
 
-        print(_name)
-        print(_station)
-        print(_skill)
-        print(_cost)
-        print(_belongs)
+            print(ext.name)
+            print(ext.station)
+            print(ext.skill)
+            print(ext.cost)
+            print(ext.belongs)
+            print(ext.checked)
+        print("-------------終わり-------------------\n")
 

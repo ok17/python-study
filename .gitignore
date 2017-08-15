@@ -166,3 +166,10 @@ chapter4/docker/.docker-sync/
 chapter4/mnist/
 mail
 regex/name.txt
+/regex/reg_test.py
+/regex/reg_test2.py
+package/constants.py
+regex/reg_test.py
+regex/reg_test2.py
+test.py
+/regex/test-reg.py
