@@ -1,5 +1,6 @@
 import httplib2, os, email, base64, json, sys
 import dateutil.parser
+import textwrap
 
 from apiclient import discovery
 from oauth2client import client
@@ -77,9 +78,9 @@ def main():
 
         try:
                 # msg_obj = service.users().messages().get(userId='me', id='15dac6f3feaaf76f').execute()
-                i += 1
+                # i += 1
 
-                print("これは{}回目". format(i))
+                # print("これは{}回目". format(i))
 
                 msg_obj = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
                 # msg_obj = service.users().messages().get(userId='me', id='15dac11af669c765', format='full').execute()
@@ -93,13 +94,35 @@ def main():
                 email = MailObject(msg_obj['payload'], message['id'])
                 email.set_messages()
 
-                mail_text = email.subject + '\n\n' + email.message
+                _message_header = textwrap.dedent("""
+                    Subject:{}
+                    Sender:{}
+                    SendDate:{}
+                """).format(email.subject, email.sender, email.send_date).strip()
+
+                _file_txt = ""
+                if email.file_count is not 0:
+
+                    # _file_txt = "FileCount:{}".format(email.file_count)
+                    _file_txt = f"FileCount:{email.file_count}"
+
+                    for index, filename in enumerate(email.attachment):
+                        _file_txt += f"\nFile{index + 1}:"
+
+                        mime = email.mime_type.__getitem__(index)
+                        filename = email.attachment.__getitem__(index)
+
+                        _file_txt += f"MimeType:{mime} FileName:{filename}"
+
+                mail_text = _message_header + '\n' + _file_txt + '\n' + email.body
+
+                # mail_text = email.subject + '\n\n' + '\n' + email.sender + '\n'
                 # result    = mail_filter.calc(mail_text)
 
                 mail_dir = os.path.join(APP_ROOT, MAIL_DIR)
 
                 if not os.path.exists(mail_dir):
-                    os.mkdirs(mail_dir)
+                    os.makedirs(mail_dir)
 
                 #####  f = open(os.path.join(APP_ROOT, MAIL_DIR, result[0][0], message['id'] + '.txt'), 'w')
                 f = open(os.path.join(APP_ROOT, MAIL_DIR, message['id'] + '.txt'), 'w')
@@ -117,10 +140,9 @@ def main():
                 print('===========================================================')
                 print('subject : ', email.subject)
                 print('send_date : ', email.send_date)
-                print('from_addr : ', email.from_addr)
-                print('to_addr : ', email.to_addr)
-                print('file_name : ', email.file_name)
-                print('body    : \n', email.message)
+                print('from_addr : ', email.sender)
+                print('file_name : ', email.attachment)
+                print('body    : \n', email.body)
                 print('===========================================================')
 
         except Exception as e:
@@ -131,23 +153,75 @@ class MailObject(object):
     """
     メールオブジェクト
     """
-    subject = ""
-    message = ""
-    from_addr = ""
-    to_addr = ""
-    send_date = ""
-    file_name = ""
-    mime_type = ""
+
+    @property
+    def subject(self):
+        return self.__subject
+
+    @subject.setter
+    def subject(self, input_subject):
+        self.__subject = input_subject
+
+    @property
+    def body(self):
+        return self.__body
+
+    @body.setter
+    def body(self, input_body):
+        self.__body = input_body
+
+    @property
+    def sender(self):
+        return self.__sender
+
+    @sender.setter
+    def sender(self, input_sender):
+        self.__sender = input_sender
+
+    @property
+    def send_date(self):
+        return self.__send_date
+
+    @send_date.setter
+    def send_date(self, input_date):
+        self.__send_date = input_date
+
+    @property
+    def attachment(self):
+        return self.__attachment
+
+    @attachment.setter
+    def attachment(self, input_attachment):
+        self.__attachment.append(input_attachment)
+
+    @property
+    def mime_type(self):
+        return self.__mime_type
+
+    @mime_type.setter
+    def mime_type(self, val):
+        self.__mime_type.append(val)
+
+    @property
+    def file_count(self):
+        return len(self.attachment)
 
     def __init__(self, payload, message_id):
         super(MailObject, self).__init__()
         self.__message_id = message_id
-        self.__mime_type = payload['mimeType']
-        self.__headers = payload['headers']
-        self.__body = payload['body']
+        self.__tmp_headers = payload['headers']
+        self.__tmp_body = payload['body']
 
-        if self.__body['size'] == 0:
-            self.__parts = payload['parts']
+        # property
+        self.__subject = None
+        self.__body = None
+        self.__sender = None
+        self.__send_date = None
+        self.__attachment = []
+        self.__mime_type = []
+
+        if self.__tmp_body['size'] is 0:
+            self.__tmp_parts = payload['parts']
 
     def set_messages(self):
         self.__set_parts()
@@ -155,26 +229,26 @@ class MailObject(object):
 
     def __set_parts(self):
         print("__set_parts start \n")
-        raw_message = ""
-        if self.__body['size'] == 0:
+        _raw_body = ""
+        if self.__tmp_body['size'] == 0:
             """
                 body.sizeが0の時はpartの中にデータがあるはず
             """
-            for part in self.__parts:
+            for part in self.__tmp_parts:
                 if part["partId"] == '0':
                     # partIdが0のものがメッセージの本文であろう
-                    raw_message = part['body']['data']
+                    _raw_body = part['body']['data']
                 else:
                     # 添付ファイルの数分partがあるはず
                     self.__download_attachment(part)
         else:
-            raw_message = self.__body['data']
+            _raw_body = self.__tmp_body['data']
 
-        self.message = email.message_from_string(base64.urlsafe_b64decode(raw_message).decode('utf-8')).as_string()
+        self.body = email.message_from_string(base64.urlsafe_b64decode(_raw_body).decode('utf-8')).as_string()
 
     def __set_headers(self):
         print("__set_headers start \n")
-        for header in self.__headers:
+        for header in self.__tmp_headers:
             if header['name'] == "Subject":
                 self.subject = header['value']
 
@@ -182,32 +256,38 @@ class MailObject(object):
                 _date = dateutil.parser.parse(header['value'])
                 self.send_date = _date.strftime('%Y-%m-%d %H:%M:%S')
 
-            elif header['name'] == "To":
-                self.to_addr = header['value']
+            # elif header['name'] == "To":
+            #     self.to_addr = header['value']
 
             elif header['name'] == "From":
-                self.from_addr = header['value']
+                self.sender = header['value']
         print("__set_headers end \n")
 
     def __download_attachment(self, part):
         self.mime_type = part["mimeType"]
+        _raw_data = ""
         if part["filename"]:
-            self.file_name = part["filename"]
-
+            self.attachment.append(part["filename"])
         else:
             _ext = ".txt"
-            if self.mime_type == "text/html":
+            if self.mime_type is "text/html":
                 _ext = ".html"
-
-            self.file_name = self.__message_id + "_" + part["partId"] + _ext
-
+            _filename = self.__message_id + "_" + part["partId"] + _ext
+            self.attachment.append(_filename)
         if "attachmentId" in part["body"]:
             # データを取得しにいく
-            raw_data = self.__get_attachment(part["body"]["attachmentId"])
-            self.__save_data(raw_data["data"])
+            _data = self.__get_attachment(part["body"]["attachmentId"])
+            _raw_data = _data["data"]
+            # self.__save_data(raw_data["data"])
 
         else:
-            self.__save_data(part["body"]["data"])
+            _raw_data = part["body"]["data"]
+            # self.__save_data(part["body"]["data"])
+
+        self.__save_data(_raw_data,
+                         self.mime_type.__getitem__((len(self.mime_type)) - 1),
+                         self.attachment.__getitem__((len(self.attachment)) - 1)
+                         )
 
     def __get_attachment(self, attId):
         credentials = get_credentials()
@@ -218,19 +298,19 @@ class MailObject(object):
 
         return raw_file_data
 
-    def __save_data(self, raw_data):
+    def __save_data(self, data, mime, filename):
         mode = "w"
 
-        if self.mime_type != "text/plain":
+        if mime is not "text/plain":
             mode = "wb"
 
         attach_dir = os.path.join(APP_ROOT, ATTACHMENT_DIR)
 
         if not os.path.exists(attach_dir):
-            os.mkdirs(attach_dir)
+            os.makedirs(attach_dir)
 
-        file_data = base64.urlsafe_b64decode(raw_data.encode('UTF-8'))
-        with open(os.path.join(APP_ROOT, ATTACHMENT_DIR, self.file_name), mode) as fp:
+        file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+        with open(os.path.join(APP_ROOT, ATTACHMENT_DIR, filename), mode) as fp:
             fp.write(file_data)
 
 if __name__ == '__main__':
