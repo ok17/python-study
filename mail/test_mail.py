@@ -77,8 +77,7 @@ def main():
         print(message['id'])
 
         try:
-                # msg_obj = service.users().messages().get(userId='me', id='15dac6f3feaaf76f').execute()
-                # i += 1
+                # msg_obj = service.users().messages().get(userId='me', id='15dee282252fac62').execute()
 
                 # print("これは{}回目". format(i))
 
@@ -92,31 +91,30 @@ def main():
                 # exit()
 
                 email = MailObject(msg_obj['payload'], message['id'])
+                # email = MailObject(msg_obj['payload'], '15dee282252fac62')
                 email.set_messages()
 
-                _message_header = textwrap.dedent("""
-                    Subject:{}
-                    Sender:{}
-                    SendDate:{}
-                """).format(email.subject, email.sender, email.send_date).strip()
+                # mailの情報を文の頭につける
+                _message_header = "__start_mail_header__" + '\n'
+                _message_header += textwrap.dedent(f"""
+                    Subject:{email.subject}
+                    Sender:{email.sender}
+                    SendDate:{email.send_date}
+                """).strip()
 
-                _file_txt = ""
                 if email.file_count is not 0:
-
-                    # _file_txt = "FileCount:{}".format(email.file_count)
-                    _file_txt = f"FileCount:{email.file_count}"
+                    _message_header += '\n\n' + f"FileCount:{email.file_count}" + '\n'
 
                     for index, filename in enumerate(email.attachment):
-                        _file_txt += f"\nFile{index + 1}:"
 
                         mime = email.mime_type.__getitem__(index)
                         filename = email.attachment.__getitem__(index)
 
-                        _file_txt += f"MimeType:{mime} FileName:{filename}"
+                        _message_header += f"File{index + 1}[MimeType:{mime} FileName:{filename}]" + '\n'
 
-                mail_text = _message_header + '\n' + _file_txt + '\n' + email.body
+                _message_header += "__end_mail_header__"
+                mail_text = _message_header + '\n\n' + email.body
 
-                # mail_text = email.subject + '\n\n' + '\n' + email.sender + '\n'
                 # result    = mail_filter.calc(mail_text)
 
                 mail_dir = os.path.join(APP_ROOT, MAIL_DIR)
@@ -256,16 +254,13 @@ class MailObject(object):
                 _date = dateutil.parser.parse(header['value'])
                 self.send_date = _date.strftime('%Y-%m-%d %H:%M:%S')
 
-            # elif header['name'] == "To":
-            #     self.to_addr = header['value']
-
             elif header['name'] == "From":
                 self.sender = header['value']
         print("__set_headers end \n")
 
     def __download_attachment(self, part):
         self.mime_type = part["mimeType"]
-        _raw_data = ""
+
         if part["filename"]:
             self.attachment.append(part["filename"])
         else:
@@ -274,15 +269,14 @@ class MailObject(object):
                 _ext = ".html"
             _filename = self.__message_id + "_" + part["partId"] + _ext
             self.attachment.append(_filename)
+
         if "attachmentId" in part["body"]:
             # データを取得しにいく
             _data = self.__get_attachment(part["body"]["attachmentId"])
             _raw_data = _data["data"]
-            # self.__save_data(raw_data["data"])
 
         else:
             _raw_data = part["body"]["data"]
-            # self.__save_data(part["body"]["data"])
 
         self.__save_data(_raw_data,
                          self.mime_type.__getitem__((len(self.mime_type)) - 1),
