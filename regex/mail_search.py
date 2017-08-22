@@ -38,6 +38,7 @@ HUMAN_PROPERTIES = {
 MAIL_PROPERTIES = r"Subject:\[partner:.*\](.*)\nSender:(.*)\nSendDate:(.*)"
 FILE_PROPERTIES = r"(.*)\[MimeType:(.+)FileName:(.+)\]"
 FILE_COUNT = r"FileCount:(\d)"
+MAIL_ADDRESS = r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4})"
 
 
 CHARACTER = "(.*)"
@@ -74,10 +75,10 @@ class MailRegex:
         self.__subject = None
         self.__send_date = None
         self.__sender = None
+        self.__mail_address = None
         self.__file_count = 0
         self.__file_mime_type = []
         self.__file_name = []
-
 
     @property
     def name(self):
@@ -160,6 +161,17 @@ class MailRegex:
     @sender.setter
     def sender(self, val):
         self.__sender = val
+
+    @property
+    def mail_address(self):
+        return self.__mail_address
+
+    @mail_address.setter
+    def mail_address(self):
+        if self.sender is not None:
+            _mail_address_match = re.compile(MAIL_ADDRESS).search(self.sender)
+            self.__mail_address = _mail_address_match[1]
+        return self.__mail_address
 
     @property
     def file_count(self):
